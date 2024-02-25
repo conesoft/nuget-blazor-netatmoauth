@@ -4,8 +4,8 @@
 		<TargetFramework>net8.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
-		<AssemblyName>Conesoft.Blazor.NetdiscoAuth</AssemblyName>
-		<RootNamespace>Conesoft.Blazor.NetdiscoAuth</RootNamespace>
+		<AssemblyName>Conesoft.Blazor.NetatmoAuth</AssemblyName>
+		<RootNamespace>Conesoft.Blazor.NetatmoAuth</RootNamespace>
 	</PropertyGroup>
 
 	<PropertyGroup>
@@ -13,10 +13,10 @@
 		<Authors>davepermen</Authors>
 		<Company>Conesoft</Company>
 		<PackageIcon>Conesoft.forNuget.x256.png</PackageIcon>
-		<PackageProjectUrl>https://github.com/conesoft/nuget-blazor-netdiscoauth</PackageProjectUrl>
+		<PackageProjectUrl>https://github.com/conesoft/nuget-blazor-netatmoauth</PackageProjectUrl>
 		<PackageLicenseFile>LICENSE</PackageLicenseFile>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
-		<Description>Blazor Control for Netdisco Authorization</Description>
+		<Description>Blazor Control for Netatmo Authorization</Description>
 		<PackageTags>library dotnet-core</PackageTags>
 	</PropertyGroup>
 
