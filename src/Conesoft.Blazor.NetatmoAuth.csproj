@@ -1,0 +1,34 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<AssemblyName>Conesoft.Blazor.NetdiscoAuth</AssemblyName>
+		<RootNamespace>Conesoft.Blazor.NetdiscoAuth</RootNamespace>
+	</PropertyGroup>
+
+	<PropertyGroup>
+		<Version>0.0.1</Version>
+		<Authors>davepermen</Authors>
+		<Company>Conesoft</Company>
+		<PackageIcon>Conesoft.forNuget.x256.png</PackageIcon>
+		<PackageProjectUrl>https://github.com/conesoft/nuget-blazor-netdiscoauth</PackageProjectUrl>
+		<PackageLicenseFile>LICENSE</PackageLicenseFile>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<Description>Blazor Control for Netdisco Authorization</Description>
+		<PackageTags>library dotnet-core</PackageTags>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Include="Conesoft.forNuget.x256.png" Pack="true" PackagePath="\" />
+		<None Include="..\README.md" Pack="true" PackagePath="\" />
+		<None Include="..\LICENSE" Pack="true" PackagePath="\" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="8.0.2" />
+		<PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
+		<PackageReference Include="Netatmo" Version="1.5.3" />
+	</ItemGroup>
+</Project>

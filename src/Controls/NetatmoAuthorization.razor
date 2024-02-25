@@ -1,0 +1,23 @@
+﻿@using System.Net.Http
+
+@inject IHttpClientFactory factory
+@inject NavigationManager navigation
+
+@rendermode InteractiveServer
+
+@namespace Conesoft.Blazor.NetdiscoAuth
+
+@switch (CurrentAuthStep)
+{
+    case AuthSteps.NotAuthorized:
+        <button @onclick="Authorize">
+            @NotAuthorized
+        </button>
+        break;
+
+    case AuthSteps.AuthorizedWithToken:
+        <button @onclick="RestartAuthorization">
+            @Authorized.Invoke(User)
+        </button>
+        break;
+}
