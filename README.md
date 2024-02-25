@@ -1,2 +1,2 @@
 # nuget-blazor-netdiscoauth
-Blazor Control for Netdisco Authorization
+Blazor Control for Netatmo Authorization
