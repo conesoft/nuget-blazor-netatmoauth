@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace Conesoft.Blazor.NetdiscoAuth;
+namespace Conesoft.Blazor.NetatmoAuth;
 
 public partial class NetatmoAuthorization
 {

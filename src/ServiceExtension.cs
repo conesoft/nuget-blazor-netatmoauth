@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 
-namespace Conesoft.Blazor.NetdiscoAuth;
+namespace Conesoft.Blazor.NetatmoAuth;
 
 public static class ServiceExtension
 {

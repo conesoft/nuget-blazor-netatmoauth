@@ -5,7 +5,7 @@ using NodaTime;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 
-namespace Conesoft.Blazor.NetdiscoAuth;
+namespace Conesoft.Blazor.NetatmoAuth;
 
 public partial class NetatmoAuthorization
 {

@@ -1,4 +1,4 @@
-﻿namespace Conesoft.Blazor.NetdiscoAuth;
+﻿namespace Conesoft.Blazor.NetatmoAuth;
 
 public class DiskStorage(Func<string, string> pathGenerator) : IStorage
 {
