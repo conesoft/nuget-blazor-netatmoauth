@@ -10,14 +10,20 @@
 @switch (CurrentAuthStep)
 {
     case AuthSteps.NotAuthorized:
-        <button @onclick="Authorize">
-            @NotAuthorized
-        </button>
+        if (NotAuthorized != null)
+        {
+            <button @onclick="Authorize">
+                @NotAuthorized
+            </button>
+        }
         break;
 
     case AuthSteps.AuthorizedWithToken:
-        <button @onclick="RestartAuthorization">
-            @Authorized.Invoke(User)
-        </button>
+        if (Authorized != null)
+        {
+            <button @onclick="RestartAuthorization">
+                @Authorized.Invoke(User)
+            </button>
+        }
         break;
 }

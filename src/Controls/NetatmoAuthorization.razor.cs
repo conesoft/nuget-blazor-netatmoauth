@@ -14,8 +14,8 @@ public partial class NetatmoAuthorization
     [Parameter] public string ClientId { get; set; } = default!;
     [Parameter] public string ClientSecret { get; set; } = default!;
     [Parameter] public string Scopes { get; set; } = default!;
-    [Parameter] public RenderFragment NotAuthorized { get; set; } = default!;
-    [Parameter] public RenderFragment<AuthUser> Authorized { get; set; } = default!;
+    [Parameter] public RenderFragment? NotAuthorized { get; set; } = default;
+    [Parameter] public RenderFragment<AuthUser>? Authorized { get; set; } = default;
 
     [Inject(Key = "netatmo")] public IStorage Storage { get; set; } = default!;
 
