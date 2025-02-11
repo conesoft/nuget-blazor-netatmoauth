@@ -1,11 +1,12 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Conesoft.Blazor.NetatmoAuth.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Conesoft.Blazor.NetatmoAuth;
 
 public static class ServiceExtension
 {
-    public static IServiceCollection AddNetatmoTokenStorageOnDisk(this IServiceCollection services, Func<string, string> pathGenerator)
+    public static IServiceCollection AddNetatmoTokenStorageOnDisk<Storage>(this IServiceCollection services) where Storage : class, IStorage
     {
-        return services.AddKeyedSingleton<IStorage>("netatmo", new DiskStorage(pathGenerator));
+        return services.AddKeyedSingleton<IStorage, Storage>("netatmo");
     }
 }

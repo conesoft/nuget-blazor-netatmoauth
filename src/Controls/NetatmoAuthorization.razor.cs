@@ -1,13 +1,14 @@
-using System.Net.Http.Json;
+using Conesoft.Blazor.NetatmoAuth.Services;
 using Microsoft.AspNetCore.Components;
 using Netatmo;
 using NodaTime;
+using System.Net.Http.Json;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 
 namespace Conesoft.Blazor.NetatmoAuth;
 
-public partial class NetatmoAuthorization
+public partial class NetatmoAuthorization : ComponentBase
 {
     static string ApiUrl => "https://api.netatmo.com";
 
@@ -19,6 +20,9 @@ public partial class NetatmoAuthorization
 
     [Inject(Key = "netatmo")] public IStorage Storage { get; set; } = default!;
 
+    [Inject] IHttpClientFactory Factory { get; set; } = default!;
+    [Inject] NavigationManager Navigation { get; set; } = default!;
+
     [SupplyParameterFromQuery(Name = "state")] public string? State { get; set; }
     [SupplyParameterFromQuery(Name = "code")] public string? Code { get; set; }
 
@@ -29,7 +33,7 @@ public partial class NetatmoAuthorization
 
     protected override async Task OnInitializedAsync()
     {
-        if (State == null && Code == null && await Storage!.Exists("authorization") == false)
+        if (State == null && Code == null && Storage!.Exists("authorization") == false)
         {
             CurrentAuthStep = AuthSteps.NotAuthorized;
         }
@@ -37,11 +41,11 @@ public partial class NetatmoAuthorization
         {
             CurrentAuthStep = AuthSteps.AuthorizedWithCode;
         }
-        if (await Storage!.Exists("authorization") == true)
+        if (Storage!.Exists("authorization") == true)
         {
             CurrentAuthStep = AuthSteps.AuthorizedWithoutToken;
         }
-        if (await Storage!.Exists("token") == true)
+        if (Storage!.Exists("token") == true)
         {
             CurrentAuthStep = AuthSteps.AuthorizedWithToken;
         }
@@ -54,19 +58,20 @@ public partial class NetatmoAuthorization
 
                     await Storage!.Write("state", JsonSerializer.Serialize(new AuthState(state)));
 
-                    AuthorizeNavLink = $"{ApiUrl}/oauth2/authorize?client_id={ClientId}&scope={UrlEncoder.Default.Encode(Scopes!)}&redirect_uri={navigation.Uri}&state={state}";
+                    AuthorizeNavLink = $"{ApiUrl}/oauth2/authorize?client_id={ClientId}&scope={UrlEncoder.Default.Encode(Scopes!)}&redirect_uri={Navigation.Uri}&state={state}";
                 }
                 break;
 
             case AuthSteps.AuthorizedWithCode:
                 {
                     var authstate = JsonSerializer.Deserialize<AuthState>(await Storage!.Read("state"))!;
-                    await Storage!.Remove("state");
+                    Storage!.Remove("state");
                     if (authstate.State == State!)
                     {
                         await Storage!.Write("authorization", JsonSerializer.Serialize<AuthCode>(new(Code: Code!, State: State!)));
                     }
-                    navigation.NavigateTo("/");
+
+                    Navigation.NavigateTo(Navigation.Uri.Split("?").First(), forceLoad: true);
                 }
                 break;
 
@@ -75,23 +80,23 @@ public partial class NetatmoAuthorization
                     var authcode = JsonSerializer.Deserialize<AuthCode>(await Storage!.Read("authorization"))!;
                     Code = authcode.Code;
                     State = authcode.State;
-                    await Storage!.Remove("authorization");
+                    Storage!.Remove("authorization");
 
-                    var http = factory.CreateClient();
+                    var http = Factory.CreateClient();
                     var request = await http.PostAsync($"{ApiUrl}/oauth2/token", new FormUrlEncodedContent(new Dictionary<string, string>()
                     {
                         ["grant_type"] = "authorization_code",
                         ["client_id"] = ClientId!,
                         ["client_secret"] = ClientSecret!,
                         ["code"] = Code!,
-                        ["redirect_uri"] = navigation.Uri,
+                        ["redirect_uri"] = Navigation.Uri,
                         ["scope"] = Scopes!,
                     }));
                     var token = await request.Content.ReadFromJsonAsync<AuthToken>();
 
                     await Storage!.Write("token", JsonSerializer.Serialize(token));
 
-                    navigation.NavigateTo("/");
+                    Navigation.NavigateTo(Navigation.Uri.Split("?").First(), forceLoad: true);
                 }
                 break;
 
@@ -121,12 +126,12 @@ public partial class NetatmoAuthorization
 
     public void Authorize()
     {
-        navigation.NavigateTo(AuthorizeNavLink, forceLoad: true);
+        Navigation.NavigateTo(AuthorizeNavLink, forceLoad: true);
     }
 
-    public async Task RestartAuthorization()
+    public void RestartAuthorization()
     {
-        await Storage!.Remove("token");
-        navigation.NavigateTo("/", forceLoad: true);
+        Storage!.Remove("token");
+        Navigation.NavigateTo(Navigation.Uri.Split("?").First(), forceLoad: true);
     }
 }

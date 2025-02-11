@@ -1,21 +1,11 @@
-﻿namespace Conesoft.Blazor.NetatmoAuth;
+﻿namespace Conesoft.Blazor.NetatmoAuth.Services;
 
-public class DiskStorage(Func<string, string> pathGenerator) : IStorage
+public abstract class DiskStorage() : IStorage
 {
-    public async Task Write(string name, string value)
-    {
-        await File.WriteAllTextAsync(pathGenerator(name), value);
-    }
-    public async Task<string> Read(string name)
-    {
-        return await File.ReadAllTextAsync(pathGenerator(name));
-    }
-    public async Task<bool> Exists(string name)
-    {
-        return File.Exists(pathGenerator(name));
-    }
-    public async Task Remove(string name)
-    {
-        File.Delete(pathGenerator(name));
-    }
+    public abstract string GeneratePath(string path);
+
+    public async Task Write(string name, string value) => await File.WriteAllTextAsync(GeneratePath(name), value);
+    public async Task<string> Read(string name) => await File.ReadAllTextAsync(GeneratePath(name));
+    public bool Exists(string name) => File.Exists(GeneratePath(name));
+    public void Remove(string name) => File.Delete(GeneratePath(name));
 }

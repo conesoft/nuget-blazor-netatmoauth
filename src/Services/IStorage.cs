@@ -1,9 +1,9 @@
-﻿namespace Conesoft.Blazor.NetatmoAuth;
+﻿namespace Conesoft.Blazor.NetatmoAuth.Services;
 
 public interface IStorage
 {
-    Task<bool> Exists(string name);
+    bool Exists(string name);
     Task<string> Read(string name);
-    Task Remove(string name);
+    void Remove(string name);
     Task Write(string name, string value);
 }
