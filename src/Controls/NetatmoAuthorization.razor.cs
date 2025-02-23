@@ -1,5 +1,6 @@
 using Conesoft.Blazor.NetatmoAuth.Services;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Http;
 using Netatmo;
 using NodaTime;
 using System.Net.Http.Json;
@@ -8,7 +9,7 @@ using System.Text.Json;
 
 namespace Conesoft.Blazor.NetatmoAuth;
 
-public partial class NetatmoAuthorization : ComponentBase
+public partial class NetatmoAuthorization : ComponentBase, IDisposable
 {
     static string ApiUrl => "https://api.netatmo.com";
 
@@ -23,6 +24,8 @@ public partial class NetatmoAuthorization : ComponentBase
     [Inject] IHttpClientFactory Factory { get; set; } = default!;
     [Inject] NavigationManager Navigation { get; set; } = default!;
 
+    [CascadingParameter] HttpContext? HttpContext { get; set; }
+
     [SupplyParameterFromQuery(Name = "state")] public string? State { get; set; }
     [SupplyParameterFromQuery(Name = "code")] public string? Code { get; set; }
 
@@ -30,6 +33,12 @@ public partial class NetatmoAuthorization : ComponentBase
     AuthSteps CurrentAuthStep { get; set; } = AuthSteps.NotAuthorized;
     AuthUser User { get; set; } = new("", "");
     string AuthorizeNavLink { get; set; } = "";
+
+    [Inject] PersistentComponentState ApplicationState { get; set; } = default!;
+
+    private PersistingComponentStateSubscription persistingSubscription;
+
+    public void Dispose() => persistingSubscription.Dispose();
 
     protected override async Task OnInitializedAsync()
     {
@@ -58,7 +67,31 @@ public partial class NetatmoAuthorization : ComponentBase
 
                     await Storage!.Write("state", JsonSerializer.Serialize(new AuthState(state)));
 
-                    AuthorizeNavLink = $"{ApiUrl}/oauth2/authorize?client_id={ClientId}&scope={UrlEncoder.Default.Encode(Scopes!)}&redirect_uri={Navigation.Uri}&state={state}";
+                    var redirect_uri = Navigation.Uri;
+
+
+                    persistingSubscription = ApplicationState.RegisterOnPersisting(() =>
+                    {
+                        ApplicationState.PersistAsJson("redirect_uri", redirect_uri);
+                        return Task.CompletedTask;
+                    });
+
+                    if (!ApplicationState.TryTakeFromJson<string>("redirect_uri", out var restored))
+                    {
+                        if (HttpContext?.Request.Headers.TryGetValue("X-Forwarded-Host", out var value) == true && value.Count == 1)
+                        {
+                            redirect_uri = new UriBuilder(Navigation.Uri)
+                            {
+                                Host = value.First()
+                            }.Uri.ToString();
+                        }
+                    }
+                    else
+                    {
+                        redirect_uri = restored!;
+                    }
+
+                    AuthorizeNavLink = $"{ApiUrl}/oauth2/authorize?client_id={ClientId}&scope={UrlEncoder.Default.Encode(Scopes!)}&redirect_uri={redirect_uri}&state={state}";
                 }
                 break;
 
