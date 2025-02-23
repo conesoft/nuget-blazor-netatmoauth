@@ -1,8 +1,7 @@
 using Conesoft.Blazor.NetatmoAuth.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Http;
-using Netatmo;
-using NodaTime;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -11,7 +10,14 @@ namespace Conesoft.Blazor.NetatmoAuth;
 
 public partial class NetatmoAuthorization : ComponentBase, IDisposable
 {
-    static string ApiUrl => "https://api.netatmo.com";
+    static readonly string apiUrl = "https://api.netatmo.com";
+
+    [Inject(Key = "netatmo")] public IStorage Storage { get; set; } = default!;
+    [Inject] IHttpClientFactory Factory { get; set; } = default!;
+    [Inject] NavigationManager Navigation { get; set; } = default!;
+    [Inject] PersistentComponentState ApplicationState { get; set; } = default!;
+
+    [CascadingParameter] HttpContext? HttpContext { get; set; }
 
     [Parameter] public string ClientId { get; set; } = default!;
     [Parameter] public string ClientSecret { get; set; } = default!;
@@ -19,44 +25,24 @@ public partial class NetatmoAuthorization : ComponentBase, IDisposable
     [Parameter] public RenderFragment? NotAuthorized { get; set; } = default;
     [Parameter] public RenderFragment<AuthUser>? Authorized { get; set; } = default;
 
-    [Inject(Key = "netatmo")] public IStorage Storage { get; set; } = default!;
-
-    [Inject] IHttpClientFactory Factory { get; set; } = default!;
-    [Inject] NavigationManager Navigation { get; set; } = default!;
-
-    [CascadingParameter] HttpContext? HttpContext { get; set; }
-
     [SupplyParameterFromQuery(Name = "state")] public string? State { get; set; }
     [SupplyParameterFromQuery(Name = "code")] public string? Code { get; set; }
 
-    enum AuthSteps { NotAuthorized, AuthorizedWithCode, AuthorizedWithoutToken, AuthorizedWithToken }
     AuthSteps CurrentAuthStep { get; set; } = AuthSteps.NotAuthorized;
     AuthUser User { get; set; } = new("", "");
     string AuthorizeNavLink { get; set; } = "";
 
-    [Inject] PersistentComponentState ApplicationState { get; set; } = default!;
-
-    private PersistingComponentStateSubscription persistingSubscription;
-
-    public void Dispose() => persistingSubscription.Dispose();
-
     protected override async Task OnInitializedAsync()
     {
-        if (State == null && Code == null && Storage!.Exists("authorization") == false)
-        {
-            CurrentAuthStep = AuthSteps.NotAuthorized;
-        }
+        CurrentAuthStep = AuthSteps.NotAuthorized;
+
         if (State != null && Code != null)
         {
-            CurrentAuthStep = AuthSteps.AuthorizedWithCode;
+            CurrentAuthStep = AuthSteps.AuthorizingWithCode;
         }
-        if (Storage!.Exists("authorization") == true)
+        if (Storage.Exists("token") == true)
         {
-            CurrentAuthStep = AuthSteps.AuthorizedWithoutToken;
-        }
-        if (Storage!.Exists("token") == true)
-        {
-            CurrentAuthStep = AuthSteps.AuthorizedWithToken;
+            CurrentAuthStep = AuthSteps.Authorized;
         }
 
         switch (CurrentAuthStep)
@@ -65,106 +51,100 @@ public partial class NetatmoAuthorization : ComponentBase, IDisposable
                 {
                     string state = UrlEncoder.Default.Encode(Guid.NewGuid().ToString());
 
-                    await Storage!.Write("state", JsonSerializer.Serialize(new AuthState(state)));
+                    await Storage.Write("state", state);
 
-                    var redirect_uri = Navigation.Uri;
-
-
-                    persistingSubscription = ApplicationState.RegisterOnPersisting(() =>
-                    {
-                        ApplicationState.PersistAsJson("redirect_uri", redirect_uri);
-                        return Task.CompletedTask;
-                    });
-
-                    if (!ApplicationState.TryTakeFromJson<string>("redirect_uri", out var restored))
-                    {
-                        if (HttpContext?.Request.Headers.TryGetValue("X-Forwarded-Host", out var value) == true && value.Count == 1)
-                        {
-                            redirect_uri = new UriBuilder(Navigation.Uri)
-                            {
-                                Host = value.First()
-                            }.Uri.ToString();
-                        }
-                    }
-                    else
-                    {
-                        redirect_uri = restored!;
-                    }
-
-                    AuthorizeNavLink = $"{ApiUrl}/oauth2/authorize?client_id={ClientId}&scope={UrlEncoder.Default.Encode(Scopes!)}&redirect_uri={redirect_uri}&state={state}";
+                    AuthorizeNavLink = $"{apiUrl}/oauth2/authorize?client_id={ClientId}&redirect_uri={GetRedirectUri()}&scope={UrlEncoder.Default.Encode(Scopes!)}&state={state}";
                 }
                 break;
 
-            case AuthSteps.AuthorizedWithCode:
+            case AuthSteps.AuthorizingWithCode:
                 {
-                    var authstate = JsonSerializer.Deserialize<AuthState>(await Storage!.Read("state"))!;
+                    var authstate = await Storage.Read("state");
                     Storage!.Remove("state");
-                    if (authstate.State == State!)
+                    if (authstate != State)
                     {
-                        await Storage!.Write("authorization", JsonSerializer.Serialize<AuthCode>(new(Code: Code!, State: State!)));
+                        return;
                     }
-
-                    Navigation.NavigateTo(Navigation.Uri.Split("?").First(), forceLoad: true);
-                }
-                break;
-
-            case AuthSteps.AuthorizedWithoutToken:
-                {
-                    var authcode = JsonSerializer.Deserialize<AuthCode>(await Storage!.Read("authorization"))!;
-                    Code = authcode.Code;
-                    State = authcode.State;
-                    Storage!.Remove("authorization");
-
                     var http = Factory.CreateClient();
-                    var request = await http.PostAsync($"{ApiUrl}/oauth2/token", new FormUrlEncodedContent(new Dictionary<string, string>()
+                    var request = await http.PostAsync($"{apiUrl}/oauth2/token", new FormUrlEncodedContent(new Dictionary<string, string>()
                     {
                         ["grant_type"] = "authorization_code",
                         ["client_id"] = ClientId!,
                         ["client_secret"] = ClientSecret!,
                         ["code"] = Code!,
-                        ["redirect_uri"] = Navigation.Uri,
+                        ["redirect_uri"] = GetRedirectUri(),
                         ["scope"] = Scopes!,
                     }));
                     var token = await request.Content.ReadFromJsonAsync<AuthToken>();
 
-                    await Storage!.Write("token", JsonSerializer.Serialize(token));
+                    await Storage.Write("token", JsonSerializer.Serialize(token));
 
-                    Navigation.NavigateTo(Navigation.Uri.Split("?").First(), forceLoad: true);
+                    // remove the query parameters from the url
+                    Navigation.NavigateTo(GetRedirectUri(), forceLoad: true);
                 }
                 break;
 
-            case AuthSteps.AuthorizedWithToken:
+            case AuthSteps.Authorized:
                 {
-                    var token = JsonSerializer.Deserialize<AuthToken>(await Storage!.Read("token"));
-
-                    var client = new Client(SystemClock.Instance, ApiUrl, ClientId, ClientSecret);
-
-                    client.ProvideOAuth2Token(token!.AccessToken, token!.RefreshToken);
-
-                    try
+                    // load user information
+                    var token = JsonSerializer.Deserialize<AuthToken>(await Storage.Read("token"));
+                    if(token == null)
                     {
-                        var stationsData = await client.Weather.GetStationsData();
-                        User = new(
-                            Username: stationsData?.Body.User.Mail.Split("@").FirstOrDefault() ?? "",
-                            Home: stationsData?.Body.Devices.FirstOrDefault()?.StationName.Split("(").FirstOrDefault()?.Trim() ?? ""
-                            );
+                        return;
                     }
-                    catch (Exception)
+                    var http = Factory.CreateClient();
+                    http.DefaultRequestHeaders.Authorization = new("Bearer", token.AccessToken);
+                    http.DefaultRequestHeaders.Accept.Add(MediaTypeWithQualityHeaderValue.Parse("application/json"));
+                    var result = await http.GetFromJsonAsync<StationsData.Result>($"{apiUrl}/api/getstationsdata");
+                    if(result == null)
                     {
+                        return;
                     }
+                    var user = result.Body.User.Mail.Split('@').First();
+                    var home = result.Body.Devices.First().StationName.Split('(').First().Trim();
+                    User = new(user, home);
                 }
                 break;
         }
     }
 
-    public void Authorize()
-    {
-        Navigation.NavigateTo(AuthorizeNavLink, forceLoad: true);
-    }
-
     public void RestartAuthorization()
     {
         Storage!.Remove("token");
-        Navigation.NavigateTo(Navigation.Uri.Split("?").First(), forceLoad: true);
+        Navigation.NavigateTo(GetRedirectUri(), forceLoad: true);
+    }
+
+    private PersistingComponentStateSubscription persistingSubscription;
+    public void Dispose() => persistingSubscription.Dispose();
+    private string GetRedirectUri()
+    {
+        var redirect_uri = Navigation.Uri.Split("?").First();
+
+        persistingSubscription = ApplicationState.RegisterOnPersisting(() =>
+        {
+            ApplicationState.PersistAsJson(nameof(redirect_uri), redirect_uri);
+            return Task.CompletedTask;
+        });
+
+        if (!ApplicationState.TryTakeFromJson<string>(nameof(redirect_uri), out var restored))
+        {
+            if (
+                HttpContext?.Request.Headers.TryGetValue("X-Forwarded-Host", out var hostvalue) == true && hostvalue.Count == 1 && hostvalue.FirstOrDefault() is string host
+                &&
+                HttpContext?.Request.Headers.TryGetValue("X-Forwarded-Proto", out var protocolvalue) == true && protocolvalue.Count == 1 && protocolvalue.FirstOrDefault() is string protocol
+            )
+            {
+                redirect_uri = new UriBuilder(redirect_uri)
+                {
+                    Host = host,
+                    Port = protocol.EndsWith('s') ? 443 : 80
+                }.Uri.ToString();
+            }
+        }
+        else
+        {
+            redirect_uri = restored!;
+        }
+        return redirect_uri;
     }
 }

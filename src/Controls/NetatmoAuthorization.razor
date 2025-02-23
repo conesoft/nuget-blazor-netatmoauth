@@ -7,13 +7,13 @@
     case AuthSteps.NotAuthorized:
         if (NotAuthorized != null)
         {
-            <button @onclick="Authorize">
-                @NotAuthorized
-            </button>
+            <form method="post" action="@AuthorizeNavLink" enctype="application/x-www-form-urlencoded">
+                <button type="submit">@NotAuthorized</button>
+            </form>
         }
         break;
 
-    case AuthSteps.AuthorizedWithToken:
+    case AuthSteps.Authorized:
         if (Authorized != null)
         {
             <button @onclick="RestartAuthorization">
